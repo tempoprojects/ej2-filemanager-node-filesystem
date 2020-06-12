@@ -15,7 +15,8 @@ const fs = require('fs');
 var cors = require('cors');
 const pattern = /(\.\.\/)/g;
 
-const contentRootPath = yargs.argv.d;
+// const contentRootPath = path.join(yargs.argv.d, 'bla2', 'foo1');
+const contentRootPath = path.join(yargs.argv.d);
 
 app.use(bodyParser.urlencoded({
     extended: true
@@ -1060,9 +1061,13 @@ app.post('/', function (req, res) {
 
     // Action to read a file
     if (req.body.action == "read") {
+        console.log('READING file...');
+
         (async () => {
             const filesList = await GetFiles(req, res);
+            console.log('filesList', filesList);
             const cwdFiles = await FileManagerDirectoryContent(req, res, contentRootPath + req.body.path);
+            console.log('cwdFiles', cwdFiles);
             cwdFiles.name = req.body.path == "/" ? rootName = (path.basename(contentRootPath + req.body.path)) : path.basename(contentRootPath + req.body.path)
             var response = {};
             if (cwdFiles.permission != null && !cwdFiles.permission.read) {

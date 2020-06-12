@@ -33,21 +33,34 @@
     "file-system": "^2.2.2",
     "gulp": "^4.0.2",
     "jshint-stylish": "^2.2.1",
+    "morgan": "^1.10.0",
     "multer": "^1.4.1",
+    "parse": "^2.13.0",
     "path": "^0.12.7",
     "yargs": "^14.2.0"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.6",
+    "@types/express": "^4.17.6",
+    "@types/node": "^14.0.13",
+    "@types/parse": "^2.12.1",
+    "concurrently": "^5.2.0",
+    "gulp": "^3.9.0",
     "gulp-jshint": "^2.1.0",
     "jshint": "^2.10.2",
-    "gulp": "^3.9.0",
+    "nodemon": "^2.0.4",
     "require-dir": "^0.3.2",
     "requirejs": "^2.2.0",
-    "shelljs": "^0.7.0"
+    "shelljs": "^0.7.0",
+    "ts-node": "^8.10.2",
+    "tslint": "^6.1.2",
+    "typescript": "^3.9.5"
   },
   "scripts": {
     "test": "gulp lint",
     "start": "node filesystem-server.js -d C:/Users",
-    "ci-publish": "gulp publish"
+    "ci-publish": "gulp publish",
+    "build": "tsc -p src",
+    "debug": "npm run build && concurrently --kill-others \"tsc -w -p src\" \"nodemon --inspect dist/index.js -e ts\""
   }
 }
