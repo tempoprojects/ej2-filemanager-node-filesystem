@@ -19,9 +19,9 @@ const parseObjectToFileManagerNode = (obj: Parse.Object): FileManagerNode => {
     }
 }
 
-export const getReadStructure = (root: Parse.Object, children: Parse.Object[]) => {
+export const getReadStructure = (parent: Parse.Object, children: Parse.Object[]): ReadStructure => {
 
-    const cwd: FileManagerNode = parseObjectToFileManagerNode(root);
+    const cwd: FileManagerNode = parseObjectToFileManagerNode(parent);
 
     const files: FileManagerNode[] = children.map(obj => {
         return parseObjectToFileManagerNode(obj);
@@ -39,7 +39,7 @@ export const getReadStructure = (root: Parse.Object, children: Parse.Object[]) =
     return structure;
 }
 
-export const getDetailsStructure = (obj: Parse.Object, path: string) => {
+export const getDetailsStructure = (obj: Parse.Object, path: string): DetailsStructure => {
 
     const fmNode = parseObjectToFileManagerNode(obj);
 
@@ -65,6 +65,12 @@ export const getDetailsStructure = (obj: Parse.Object, path: string) => {
     };
 
     return structure;
+}
+
+export const getCreateStructure = (obj: Parse.Object): CreateStructure => {
+    return {
+        files: parseObjectToFileManagerNode(obj),
+    }
 }
 
 // ReadStructure
@@ -104,4 +110,9 @@ export interface Details {
 
 export interface DetailsStructure {
     details: Details;
+}
+
+// CreateStructure
+export interface CreateStructure {
+    files: FileManagerNode
 }

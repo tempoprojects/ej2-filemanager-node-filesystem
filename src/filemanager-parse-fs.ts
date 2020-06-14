@@ -4,9 +4,9 @@ import * as bodyParser from 'body-parser'
 import * as cors from 'cors'
 import * as Parse from 'parse/node';
 import { Request, Response } from 'express'
-import { getReadStructure, getDetailsStructure } from './filemanager-helpers'
+import { getReadStructure, getDetailsStructure, getCreateStructure } from './filemanager-helpers'
 import { assertProject } from './express-helpers';
-import { getProjectFiles, getProjectFile } from './parse-helpers';
+import { getProjectFiles, getProjectFile, createProjectFileWithoutData, createProjectDirectory } from './parse-helpers';
 
 Parse.initialize(process.env.PARSE_SERVER_APP_ID || 'tempoProjectsApp');
 (Parse as any).serverURL = process.env.PARSE_SERVER_URL || 'https://tempo-projects-api-development.italk.hr/parse';
@@ -50,6 +50,7 @@ export default function() {
         let response;
 
         const objectId = req.body.data && req.body.data[0]?.objectId;
+        const title = req.body.name;
         
         if (action === 'read') {
             if (!objectId) {
@@ -62,11 +63,32 @@ export default function() {
                 response = getReadStructure(parent, projectFiles);
             }
         }
-        
+
+        // Action for getDetails
         if (action === 'details') {
             console.log('objectId', objectId);
             const projectFile = await getProjectFile(objectId);
             response = getDetailsStructure(projectFile, path);
+        }
+
+        // Action for copying files
+        if (req.body.action === 'copy') {
+        }
+        // Action for move files
+        if (req.body.action === 'move') {
+        }
+        // Action to create a new folder
+        if (req.body.action === 'create') {
+            const parent = createProjectFileWithoutData(objectId);
+            const projectDirectory = await createProjectDirectory(title, project, parent);
+            response = getCreateStructure(projectDirectory);
+        }
+        // Action to remove a file
+        if (req.body.action === 'delete') {
+        }
+        // Action to rename a file
+        if (req.body.action === 'rename') {
+
         }
 
         res.setHeader('Content-Type', 'application/json');

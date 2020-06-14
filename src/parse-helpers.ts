@@ -1,5 +1,8 @@
 import * as Parse from 'parse/node';
 
+const Project = Parse.Object.extend('Project');
+const ProjectFile = Parse.Object.extend('ProjectFile');
+
 export const isAuthenticated = async (installationId: string) => {
     const query = new Parse.Query(Parse.Session);
     query.equalTo('installationId', installationId);
@@ -42,3 +45,52 @@ export const getProjectFile = async (objectId: string) => {
     console.timeEnd('getProjectFile query.first');
     return projectFile;
 }
+
+export const createProjectFileWithoutData = (objectId: string) => {
+    return ProjectFile.createWithoutData(objectId);
+}
+
+export const buildProjectFile = (title: string, project: Parse.Object, parent?: Parse.Object) => {
+    const projectFile = new ProjectFile();
+    projectFile.set('title', title);
+    projectFile.set('project', project);
+    projectFile.set('isFile', true);
+
+    const acl = new Parse.ACL();
+    acl.setRoleReadAccess('PROJECT_' + project.get('shortCode'), true);
+    acl.setRoleReadAccess('EMPLOYEE', true);
+    acl.setRoleWriteAccess('EMPLOYEE', true);
+
+    projectFile.setACL(acl);
+    if (parent) {
+        // DO NOT set project pointer to parent if directory is created at the root of project files in that case parent should be undefined
+        if (parent.id !== project.id) {
+            projectFile.set('parent', parent);
+        }
+    }
+    return projectFile;
+}
+
+export const createProjectFile = async (title: string, project: Parse.Object, parent?: Parse.Object) => {
+    const projectFile = buildProjectFile(title, project, parent);
+    console.time('createProjectFile.save');
+    projectFile.save();
+    console.timeEnd('createProjectFile.save');
+    return projectFile;
+}
+
+export const buildProjectDirectory = (title: string, project: Parse.Object, parent?: Parse.Object) => {
+    const projectDirectory = buildProjectFile(title, project, parent);
+    projectDirectory.set('isFile', false); // Every directory is not a file
+    return projectDirectory;
+}
+
+export const createProjectDirectory = async (title: string, project: Parse.Object, parent?: Parse.Object) => {
+    const projectDirectory = buildProjectDirectory(title, project, parent);
+    console.time('createProjectDirectory.save');
+    await projectDirectory.save();
+    console.timeEnd('createProjectDirectory.save');
+    return projectDirectory;
+}
+
+

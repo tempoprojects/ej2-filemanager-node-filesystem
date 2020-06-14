@@ -747,7 +747,7 @@ function replaceRequestParams(req, res) {
 /**
  * Gets the imageUrl from the client
  */
-app.get('/GetImage', function (req, res) {
+app.get('/image', function (req, res) {
     replaceRequestParams(req, res);
     var image = req.query.path.split("/").length > 1 ? req.query.path : "/" + req.query.path;
     var pathPermission = getPermission(contentRootPath + image.substr(0, image.lastIndexOf("/")), image.substr(image.lastIndexOf("/") + 1, image.length - 1), true, contentRootPath, image.substr(0, image.lastIndexOf("/")));
@@ -771,7 +771,7 @@ app.get('/GetImage', function (req, res) {
 /**
  * Handles the upload request
  */
-app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res) {
+app.post('/upload', multer(multerConfig).any('uploadFiles'), function (req, res) {
     replaceRequestParams(req, res);
     var pathPermission = getPathPermission(req.path, true, JSON.parse(req.body.data).name, contentRootPath + req.body.path, contentRootPath, JSON.parse(req.body.data).filterPath);
     if (pathPermission != null && (!pathPermission.read || !pathPermission.upload)) {
@@ -797,7 +797,7 @@ app.post('/Upload', multer(multerConfig).any('uploadFiles'), function (req, res)
 /**
  * Download a file or folder
  */
-app.post('/Download', function (req, res) {
+app.post('/download', function (req, res) {
     replaceRequestParams(req, res);
     var downloadObj = JSON.parse(req.body.downloadInput);
     var permission; var permissionDenied = false;
@@ -855,7 +855,7 @@ app.post('/Download', function (req, res) {
 /**
  * Handles the read request
  */
-app.post('/', function (req, res) {
+app.post('/actions', function (req, res) {
     replaceRequestParams(req, res);
     req.setTimeout(0);
     function getRules() {
