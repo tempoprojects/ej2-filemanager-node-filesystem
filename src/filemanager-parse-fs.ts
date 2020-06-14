@@ -4,15 +4,13 @@ import * as bodyParser from 'body-parser'
 import * as cors from 'cors'
 import * as Parse from 'parse/node';
 import { Request, Response } from 'express'
-import { getReadStructure, getDetailsStructure } from './helpers'
-import { isValidInstallationId, assertProject } from './express-helpers';
-import { getProjectFiles } from './parse-helpers';
+import { getReadStructure, getDetailsStructure } from './filemanager-helpers'
+import { assertProject } from './express-helpers';
+import { getProjectFiles, getProjectFile } from './parse-helpers';
 
 Parse.initialize(process.env.PARSE_SERVER_APP_ID || 'tempoProjectsApp');
 (Parse as any).serverURL = process.env.PARSE_SERVER_URL || 'https://tempo-projects-api-development.italk.hr/parse';
 (Parse as any).masterKey = process.env.PARSE_SERVER_MASTER_KEY || 'tempoProjectsAppMasterKey';
-
-console.log('masterKey', Parse.masterKey);
 
 export default function() {
 
@@ -32,29 +30,43 @@ export default function() {
      */
     app.post('/file-manager/actions', async (req: Request, res: Response) => {
 
+        console.log('POST /file-manager/actions started');
+
         const project = await assertProject(req, res);
         if (!project) return;
 
-        console.log('project', project);
-        console.log('project.attributes', project?.attributes);
+        // console.log('project', project);
+        // console.log('project.attributes', project?.attributes);
 
-        const projectFiles = await getProjectFiles(project);
-
-        console.log('projectFiles', projectFiles);
-        projectFiles.forEach(projectFile => {
-            console.log('projectFile', projectFile);
-            console.log('projectFile.attributes', projectFile?.attributes);
-        });
+        const path = req.body.path;
+        
+        // console.log('projectFiles', projectFiles);
+        // projectFiles.forEach(projectFile => {
+        //     console.log('projectFile', projectFile);
+        //     console.log('projectFile.attributes', projectFile?.attributes);
+        // });
 
         const action = req.body.action;
         let response;
 
+        const objectId = req.body.data && req.body.data[0]?.objectId;
+        
         if (action === 'read') {
-            response = getReadStructure(null);
+            if (!objectId) {
+                const projectFiles = await getProjectFiles(project);
+                response = getReadStructure(project, projectFiles);
+            } else {
+                console.log('parentId', objectId);
+                const parent = await getProjectFile(objectId);
+                const projectFiles = await getProjectFiles(project, parent);
+                response = getReadStructure(parent, projectFiles);
+            }
         }
-
+        
         if (action === 'details') {
-            response = getDetailsStructure(null);
+            console.log('objectId', objectId);
+            const projectFile = await getProjectFile(objectId);
+            response = getDetailsStructure(projectFile, path);
         }
 
         res.setHeader('Content-Type', 'application/json');

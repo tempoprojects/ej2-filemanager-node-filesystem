@@ -1,0 +1,107 @@
+const parseObjectToFileManagerNode = (obj: Parse.Object): FileManagerNode => {
+
+    let type = '.bin';
+    const file: Parse.File = obj?.attributes?.file;
+    if (file?.name()?.includes('.')) {
+        type = '.' + file.name()?.split('.')?.pop();
+    }
+
+    return {
+        name: obj?.attributes?.title,
+        isFile: obj?.attributes?.isFile,
+        size: obj?.attributes?.isFile ? obj?.attributes?.size || 1024 : null,
+        dateModified: obj?.attributes?.updatedAt,
+        dateCreated: obj?.attributes?.createdAt,
+        hasChild: !obj?.attributes?.isFile,
+        type,
+
+        objectId: obj?.id,
+    }
+}
+
+export const getReadStructure = (root: Parse.Object, children: Parse.Object[]) => {
+
+    const cwd: FileManagerNode = parseObjectToFileManagerNode(root);
+
+    const files: FileManagerNode[] = children.map(obj => {
+        return parseObjectToFileManagerNode(obj);
+    });
+
+    const structure: ReadStructure = {
+        cwd,
+        files,
+        // error: {
+        //     code: 401,
+        //     message: 'Some error',
+        // },
+    };
+
+    return structure;
+}
+
+export const getDetailsStructure = (obj: Parse.Object, path: string) => {
+
+    const fmNode = parseObjectToFileManagerNode(obj);
+
+    let size = fmNode.size === null ? '' : fmNode.size + ' B';
+    if (fmNode.size > 1024) {
+        size = Math.round(fmNode.size / 1024) + ' KB';
+    }
+    if (fmNode.size > (1024 * 1024)) {
+        size = Math.round(fmNode.size / (1024 * 1024)) + ' MB';
+    }
+
+    const structure: DetailsStructure = {
+
+        details: {
+            name: fmNode.name,
+            size,
+            isFile: fmNode.isFile,
+            modified: fmNode.dateModified,
+            created: fmNode.dateCreated,
+            type: fmNode.type,
+            location: path,
+        },
+    };
+
+    return structure;
+}
+
+// ReadStructure
+export interface FileManagerNode {
+    name: string;
+    isFile: boolean;
+    size: number | null;
+    dateModified: string;
+    dateCreated: string;
+    hasChild: boolean;
+    type: string;
+
+    objectId: string;
+}
+
+export interface Error {
+    code: number;
+    message: string;
+}
+
+export interface ReadStructure {
+    cwd: FileManagerNode;
+    files: FileManagerNode[];
+    error?: Error;
+}
+
+// DetailsStructure
+export interface Details {
+    name: string;
+    size: string;
+    isFile: boolean;
+    modified: string;
+    created: string;
+    type: string;
+    location: string;
+}
+
+export interface DetailsStructure {
+    details: Details;
+}
