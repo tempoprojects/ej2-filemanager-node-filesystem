@@ -33,6 +33,7 @@
     "file-system": "^2.2.2",
     "gulp": "^4.0.2",
     "jshint-stylish": "^2.2.1",
+    "moment": "^2.26.0",
     "morgan": "^1.10.0",
     "multer": "^1.4.1",
     "parse": "^2.13.0",
@@ -42,6 +43,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.6",
     "@types/express": "^4.17.6",
+    "@types/multer": "^1.4.3",
     "@types/node": "^14.0.13",
     "@types/parse": "^2.12.1",
     "concurrently": "^5.2.0",

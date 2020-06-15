@@ -50,7 +50,13 @@ export const createProjectFileWithoutData = (objectId: string) => {
     return ProjectFile.createWithoutData(objectId);
 }
 
-export const buildProjectFile = (title: string, project: Parse.Object, parent?: Parse.Object) => {
+export const buildProjectFile = (
+    title: string,
+    project: Parse.Object,
+    parent?: Parse.Object,
+    file?: Parse.File,
+    size?: number,
+) => {
     const projectFile = new ProjectFile();
     projectFile.set('title', title);
     projectFile.set('project', project);
@@ -60,23 +66,40 @@ export const buildProjectFile = (title: string, project: Parse.Object, parent?: 
     acl.setRoleReadAccess('PROJECT_' + project.get('shortCode'), true);
     acl.setRoleReadAccess('EMPLOYEE', true);
     acl.setRoleWriteAccess('EMPLOYEE', true);
-
     projectFile.setACL(acl);
+
     if (parent) {
         // DO NOT set project pointer to parent if directory is created at the root of project files in that case parent should be undefined
         if (parent.id !== project.id) {
             projectFile.set('parent', parent);
         }
     }
+
+    if (file) {
+        projectFile.set('file', file);
+        projectFile.set('size', size);
+    }
+
     return projectFile;
 }
 
-export const createProjectFile = async (title: string, project: Parse.Object, parent?: Parse.Object) => {
-    const projectFile = buildProjectFile(title, project, parent);
+export const createProjectFile = async (
+    title: string,
+    project: Parse.Object,
+    parent?: Parse.Object,
+    file?: Parse.File,
+    size?: number,
+) => {
+    const projectFile = buildProjectFile(title, project, parent, file, size);
     console.time('createProjectFile.save');
     projectFile.save();
     console.timeEnd('createProjectFile.save');
     return projectFile;
+}
+
+export const bufferToParseFile = async (name: string, buffer: any, contentType: string) => {
+    const file = new Parse.File(name, buffer, contentType);
+    return await file.save();
 }
 
 export const buildProjectDirectory = (title: string, project: Parse.Object, parent?: Parse.Object) => {

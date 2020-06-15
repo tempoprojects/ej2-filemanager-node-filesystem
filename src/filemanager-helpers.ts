@@ -19,6 +19,13 @@ const parseObjectToFileManagerNode = (obj: Parse.Object): FileManagerNode => {
     }
 }
 
+export const getExtensionFromFilename = (filename: string) => {
+    if (filename?.includes('.')) {
+        return filename?.split('.')?.pop() || 'bin';
+    }
+    return 'bin';
+}
+
 export const getReadStructure = (parent: Parse.Object, children: Parse.Object[]): ReadStructure => {
 
     const cwd: FileManagerNode = parseObjectToFileManagerNode(parent);
