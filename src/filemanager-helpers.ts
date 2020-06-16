@@ -80,6 +80,10 @@ export const getCreateStructure = (obj: Parse.Object): CreateStructure => {
     }
 }
 
+export const getUpdateStructure = (obj: Parse.Object): UpdateStructure => {
+    return getCreateStructure(obj);
+}
+
 // ReadStructure
 export interface FileManagerNode {
     name: string;
@@ -122,4 +126,7 @@ export interface DetailsStructure {
 // CreateStructure
 export interface CreateStructure {
     files: FileManagerNode
+}
+// UpdateStructure
+export interface UpdateStructure extends CreateStructure {
 }

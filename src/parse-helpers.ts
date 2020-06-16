@@ -116,4 +116,13 @@ export const createProjectDirectory = async (title: string, project: Parse.Objec
     return projectDirectory;
 }
 
+export const renameProjectFile = async (objectId: string, newTitle: string) => {
+    const projectFile = await getProjectFile(objectId);
+    projectFile.set('title', newTitle);
+    console.time('renameProjectFile.save');
+    projectFile.save();
+    console.timeEnd('renameProjectFile.save');
+    return projectFile;
+}
+
 

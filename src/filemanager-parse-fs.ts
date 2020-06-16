@@ -4,9 +4,9 @@ import * as bodyParser from 'body-parser'
 import * as cors from 'cors'
 import * as Parse from 'parse/node';
 import { Request, Response } from 'express'
-import { getReadStructure, getDetailsStructure, getCreateStructure, getExtensionFromFilename } from './filemanager-helpers'
+import { getReadStructure, getDetailsStructure, getCreateStructure, getExtensionFromFilename, getUpdateStructure } from './filemanager-helpers'
 import { assertProject } from './express-helpers';
-import { getProjectFiles, getProjectFile, createProjectFileWithoutData, createProjectDirectory, bufferToParseFile, createProjectFile } from './parse-helpers';
+import { getProjectFiles, getProjectFile, createProjectFileWithoutData, createProjectDirectory, bufferToParseFile, createProjectFile, renameProjectFile } from './parse-helpers';
 import * as multer from 'multer';
 import * as moment from 'moment';
 
@@ -90,7 +90,9 @@ export default function() {
         }
         // Action to rename a file
         if (req.body.action === 'rename') {
-
+            const newTitle = req.body.newName;
+            const projectFile = await renameProjectFile(objectId, newTitle);
+            response = getUpdateStructure(projectFile);
         }
 
         res.setHeader('Content-Type', 'application/json');
