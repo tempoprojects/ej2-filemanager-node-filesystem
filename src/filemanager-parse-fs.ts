@@ -6,7 +6,16 @@ import * as Parse from 'parse/node';
 import { Request, Response } from 'express'
 import { getReadStructure, getDetailsStructure, getCreateStructure, getExtensionFromFilename, getUpdateStructure } from './filemanager-helpers'
 import { assertProject } from './express-helpers';
-import { getProjectFiles, getProjectFile, createProjectFileWithoutData, createProjectDirectory, bufferToParseFile, createProjectFile, renameProjectFile } from './parse-helpers';
+import {
+    getProjectFiles,
+    getProjectFile,
+    createProjectFileWithoutData,
+    createProjectDirectory,
+    bufferToParseFile,
+    createProjectFile,
+    renameProjectFile,
+    deleteProjectFile,
+} from './parse-helpers';
 import * as multer from 'multer';
 import * as moment from 'moment';
 
@@ -41,27 +50,37 @@ export default function() {
         // console.log('project.attributes', project?.attributes);
 
         const path = req.body.path;
-        
+
         // console.log('projectFiles', projectFiles);
         // projectFiles.forEach(projectFile => {
         //     console.log('projectFile', projectFile);
         //     console.log('projectFile.attributes', projectFile?.attributes);
         // });
 
+        // FileManager action
         const action = req.body.action;
+        // FileManager response
         let response;
 
+        // action at which object (file/directory)
         const objectId = req.body.data && req.body.data[0]?.objectId;
+        // object's title
         const title = req.body.name;
-        
+
+        // Parse.User context
+        const sessionToken: string = req.query.sessionToken as string;
+
+        // ONLY for copy and move actions (objectId of parent object)
+        const targetObjectId = req.body.targetData?.objectId
+
         if (action === 'read') {
             if (!objectId) {
-                const projectFiles = await getProjectFiles(project);
+                const projectFiles = await getProjectFiles(sessionToken, project);
                 response = getReadStructure(project, projectFiles);
             } else {
                 console.log('parentId', objectId);
-                const parent = await getProjectFile(objectId);
-                const projectFiles = await getProjectFiles(project, parent);
+                const parent = await getProjectFile(sessionToken, objectId);
+                const projectFiles = await getProjectFiles(sessionToken, project, parent);
                 response = getReadStructure(parent, projectFiles);
             }
         }
@@ -69,7 +88,7 @@ export default function() {
         // Action for getDetails
         if (action === 'details') {
             console.log('objectId', objectId);
-            const projectFile = await getProjectFile(objectId);
+            const projectFile = await getProjectFile(sessionToken, objectId);
             response = getDetailsStructure(projectFile, path);
         }
 
@@ -78,20 +97,50 @@ export default function() {
         }
         // Action for move files
         if (req.body.action === 'move') {
+
+            let parent;
+            // For files/directories at the project root `parent` should be undefined
+            if (project.id !== targetObjectId) {
+                parent = createProjectFileWithoutData(targetObjectId);
+            }
+
+            const projectFile = await getProjectFile(sessionToken, objectId);
+            if (parent) {
+                projectFile.set('parent', parent);
+            } else {
+                projectFile.unset('parent');
+            }
+            await projectFile.save(null, { sessionToken });
+
+            response = getUpdateStructure(projectFile);
         }
         // Action to create a new folder
         if (req.body.action === 'create') {
             const parent = createProjectFileWithoutData(objectId);
-            const projectDirectory = await createProjectDirectory(title, project, parent);
+            const projectDirectory = await createProjectDirectory(sessionToken, title, project, parent);
             response = getCreateStructure(projectDirectory);
         }
         // Action to remove a file
         if (req.body.action === 'delete') {
+
+            const filesForDelete = req.body.data || [];
+
+            response = [];
+
+            for (let i = 0; i < filesForDelete.length; i++) {
+                const fileForDelete = filesForDelete[i];
+                const projectFile = await deleteProjectFile(sessionToken, fileForDelete.objectId);
+                response.push(getUpdateStructure(projectFile).files);
+            }
+
+            response = {
+                files: response,
+            };
         }
         // Action to rename a file
         if (req.body.action === 'rename') {
             const newTitle = req.body.newName;
-            const projectFile = await renameProjectFile(objectId, newTitle);
+            const projectFile = await renameProjectFile(sessionToken, objectId, newTitle);
             response = getUpdateStructure(projectFile);
         }
 
@@ -155,6 +204,8 @@ export default function() {
         res.setHeader('Content-Type', 'application/json');
         const files = req.files;
 
+        const sessionToken: string = req.query.sessionToken as string;
+
         const project = await assertProject(req, res);
         if (!project) return;
 
@@ -198,11 +249,11 @@ export default function() {
             const filename = `${now.format('f_YYYY-MM-DD_hh-mm-ss_x')}.${extension}`;
 
             console.log('file', file);
-            const parseFile = await bufferToParseFile(filename, Array.from(file.buffer), file.mimtype);
+            const parseFile = await bufferToParseFile(sessionToken, filename, Array.from(file.buffer), file.mimtype);
             // console.log('parseFile', parseFile);
 
             const parent = createProjectFileWithoutData(objectId);
-            const projectFile = await createProjectFile(title, project, parent, parseFile, file.size);
+            const projectFile = await createProjectFile(sessionToken, title, project, parent, parseFile, file.size);
             console.log('projectFile', projectFile.id);
             // console.log('projectFile', projectFile.attributes);
         }

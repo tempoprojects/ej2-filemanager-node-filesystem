@@ -3,27 +3,42 @@ import * as Parse from 'parse/node';
 const Project = Parse.Object.extend('Project');
 const ProjectFile = Parse.Object.extend('ProjectFile');
 
-export const isAuthenticated = async (installationId: string) => {
-    const query = new Parse.Query(Parse.Session);
-    query.equalTo('installationId', installationId);
-    console.time('isAuthenticated query.first');
-    const session: Parse.Session = await query.first({ useMasterKey: true });
-    console.timeEnd('isAuthenticated query.first');
-    return !!session;
-}
+// export const isAuthenticated = async (installationId: string, sessionToken: string): Promise<Parse.Object | undefined> => {
+//     const query = new Parse.Query(Parse.Session);
+//     query.equalTo('installationId', installationId);
+//     query.equalTo('sessionToken', sessionToken);
+//     console.time('isAuthenticated query.first');
+//     const session: Parse.Session = await query.first({ useMasterKey: true });
+//     console.timeEnd('isAuthenticated query.first');
+//     console.log('session', session);
+//     try {
+//         const user = session?.get('user');
+//         console.log('user', user);
 
-export const getProject = async (projectShortCode: string) => {
-    const query = new Parse.Query('Project');
+//         await user.fetch({ useMasterKey: true });
+//         console.log('user.attributes', user.attributes);
+
+//         return user;
+//     } catch (e) {
+//         console.error('isAuthenticated.user', e);
+//         return;
+//     }
+// }
+
+export const getProject = async (sessionToken: string, projectShortCode: string) => {
+    const query = new Parse.Query(Project);
     query.equalTo('shortCode', projectShortCode);
     console.time('getProject query.first');
-    const project = await query.first({ useMasterKey: true });
+    // const project = await query.first({ useMasterKey: true });
+    const project = await query.first({ sessionToken });
     console.timeEnd('getProject query.first');
     return project;
 }
 
-export const getProjectFiles = async (project: Parse.Object, parent?: Parse.Object) => {
+export const getProjectFiles = async (sessionToken: string, project: Parse.Object, parent?: Parse.Object) => {
     const query = new Parse.Query('ProjectFile');
     query.equalTo('project', project);
+    query.doesNotExist('deletedAt'); // Do not show soft deleted files
     if (parent) {
         // files/dirs in subdirectories
         query.equalTo('parent', parent);
@@ -32,16 +47,18 @@ export const getProjectFiles = async (project: Parse.Object, parent?: Parse.Obje
         query.doesNotExist('parent');
     }
     console.time('getProjectFiles query.find')
-    const projectFiles = await query.find({ useMasterKey: true });
+    // const projectFiles = await query.find({ useMasterKey: true });
+    const projectFiles = await query.find({ sessionToken });
     console.timeEnd('getProjectFiles query.find')
     return projectFiles;
 }
 
-export const getProjectFile = async (objectId: string) => {
+export const getProjectFile = async (sessionToken: string, objectId: string) => {
     const query = new Parse.Query('ProjectFile');
     query.equalTo('objectId', objectId);
     console.time('getProjectFile query.first');
-    const projectFile = await query.first({ useMasterKey: true });
+    // const projectFile = await query.first({ useMasterKey: true });
+    const projectFile = await query.first({ sessionToken });
     console.timeEnd('getProjectFile query.first');
     return projectFile;
 }
@@ -84,6 +101,7 @@ export const buildProjectFile = (
 }
 
 export const createProjectFile = async (
+    sessionToken: string,
     title: string,
     project: Parse.Object,
     parent?: Parse.Object,
@@ -92,14 +110,14 @@ export const createProjectFile = async (
 ) => {
     const projectFile = buildProjectFile(title, project, parent, file, size);
     console.time('createProjectFile.save');
-    projectFile.save();
+    await projectFile.save(null, { sessionToken });
     console.timeEnd('createProjectFile.save');
     return projectFile;
 }
 
-export const bufferToParseFile = async (name: string, buffer: any, contentType: string) => {
-    const file = new Parse.File(name, buffer, contentType);
-    return await file.save();
+export const bufferToParseFile = async (sessionToken: string, name: string, buffer: any, contentType: string) => {
+    const file: any = new Parse.File(name, buffer, contentType);
+    return await file.save({ sessionToken });
 }
 
 export const buildProjectDirectory = (title: string, project: Parse.Object, parent?: Parse.Object) => {
@@ -108,20 +126,29 @@ export const buildProjectDirectory = (title: string, project: Parse.Object, pare
     return projectDirectory;
 }
 
-export const createProjectDirectory = async (title: string, project: Parse.Object, parent?: Parse.Object) => {
+export const createProjectDirectory = async (sessionToken: string, title: string, project: Parse.Object, parent?: Parse.Object) => {
     const projectDirectory = buildProjectDirectory(title, project, parent);
     console.time('createProjectDirectory.save');
-    await projectDirectory.save();
+    await projectDirectory.save(null, { sessionToken });
     console.timeEnd('createProjectDirectory.save');
     return projectDirectory;
 }
 
-export const renameProjectFile = async (objectId: string, newTitle: string) => {
-    const projectFile = await getProjectFile(objectId);
+export const renameProjectFile = async (sessionToken: string, objectId: string, newTitle: string) => {
+    const projectFile = await getProjectFile(sessionToken, objectId);
     projectFile.set('title', newTitle);
     console.time('renameProjectFile.save');
-    projectFile.save();
+    projectFile.save(null, { sessionToken });
     console.timeEnd('renameProjectFile.save');
+    return projectFile;
+}
+
+export const deleteProjectFile = async (sessionToken: string, objectId: string) => {
+    const projectFile = await getProjectFile(sessionToken, objectId);
+    projectFile.set('deletedAt', new Date());
+    console.time('deleteProjectFile.save');
+    projectFile.save(null, { sessionToken });
+    console.timeEnd('deleteProjectFile.save');
     return projectFile;
 }
 
