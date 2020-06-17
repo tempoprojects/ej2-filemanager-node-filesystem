@@ -15,6 +15,8 @@ import {
     createProjectFile,
     renameProjectFile,
     deleteProjectFile,
+    createProjectFileFromExisting,
+    recursiveCopyProjectFile,
 } from './parse-helpers';
 import * as multer from 'multer';
 import * as moment from 'moment';
@@ -41,7 +43,7 @@ export default function() {
      */
     app.post('/file-manager/actions', async (req: Request, res: Response) => {
 
-        console.log('POST /file-manager/actions started');
+        console.log('POST /file-manager/actions started', 'body', req.body);
 
         const project = await assertProject(req, res);
         if (!project) return;
@@ -94,6 +96,46 @@ export default function() {
 
         // Action for copying files
         if (req.body.action === 'copy') {
+
+            let targetParent: Parse.Object;
+            // For files/directories at the project root `parent` should be undefined
+            if (project.id !== targetObjectId) {
+                targetParent = createProjectFileWithoutData(targetObjectId);
+            }
+
+            const itemsForCopy = req.body.data || [];
+
+            response = [];
+
+            for (let i = 0; i < itemsForCopy.length; i++) {
+                const objectId = itemsForCopy[i]?.objectId;
+
+                if (objectId) {
+                    const projectFile = await getProjectFile(sessionToken, objectId);
+
+                    const duplicatedProjectFile = await recursiveCopyProjectFile(sessionToken, project, projectFile, targetParent);
+
+                    // let newProjectFileOrDirectory: Parse.Object;
+                    // if (projectFile.get('isFile')) {
+                    //     newProjectFileOrDirectory = await createProjectFileFromExisting(sessionToken, projectFile, parent);
+                    // } else {
+                    //     // newProjectFileOrDirectory = await createProjectDirectory(
+                    //     //     sessionToken,
+                    //     //     projectFile.get('title'),
+                    //     //     projectFile.get('project'),
+                    //     //     parent,
+                    //     // );
+
+                       
+                    // }
+
+                    response.push(getUpdateStructure(duplicatedProjectFile).files);
+                }
+            }
+
+            response = {
+                files: response,
+            };
         }
         // Action for move files
         if (req.body.action === 'move') {
@@ -116,7 +158,10 @@ export default function() {
         }
         // Action to create a new folder
         if (req.body.action === 'create') {
-            const parent = createProjectFileWithoutData(objectId);
+            let parent;
+            if (objectId) {
+                parent = createProjectFileWithoutData(objectId);
+            }
             const projectDirectory = await createProjectDirectory(sessionToken, title, project, parent);
             response = getCreateStructure(projectDirectory);
         }

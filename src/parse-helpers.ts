@@ -85,7 +85,7 @@ export const buildProjectFile = (
     acl.setRoleWriteAccess('EMPLOYEE', true);
     projectFile.setACL(acl);
 
-    if (parent) {
+    if (parent?.id) {
         // DO NOT set project pointer to parent if directory is created at the root of project files in that case parent should be undefined
         if (parent.id !== project.id) {
             projectFile.set('parent', parent);
@@ -115,6 +115,40 @@ export const createProjectFile = async (
     return projectFile;
 }
 
+export const createProjectFileFromExisting = async (
+    sessionToken: string,
+    project: Parse.Object,
+    projectFile: Parse.Object,
+    parent?: Parse.Object,
+) => {
+
+    const newProjectFile = await createProjectFile(
+        sessionToken,
+        projectFile.get('title'),
+        project,
+        parent,
+        projectFile.get('file'),
+        projectFile.get('size'),
+    );
+    return newProjectFile;
+}
+
+export const createProjectDirectoryFromExisting = async (
+    sessionToken: string,
+    project: Parse.Object,
+    projectDirectory: Parse.Object,
+    parent?: Parse.Object,
+) => {
+
+    const newProjectDirectory = await createProjectDirectory(
+        sessionToken,
+        projectDirectory.get('title'),
+        project,
+        parent,
+    );
+    return newProjectDirectory;
+}
+
 export const bufferToParseFile = async (sessionToken: string, name: string, buffer: any, contentType: string) => {
     const file: any = new Parse.File(name, buffer, contentType);
     return await file.save({ sessionToken });
@@ -128,6 +162,8 @@ export const buildProjectDirectory = (title: string, project: Parse.Object, pare
 
 export const createProjectDirectory = async (sessionToken: string, title: string, project: Parse.Object, parent?: Parse.Object) => {
     const projectDirectory = buildProjectDirectory(title, project, parent);
+    console.log('projectDirectory', projectDirectory);
+    console.log('projectDirectory.attributes', projectDirectory.attributes);
     console.time('createProjectDirectory.save');
     await projectDirectory.save(null, { sessionToken });
     console.timeEnd('createProjectDirectory.save');
@@ -150,6 +186,33 @@ export const deleteProjectFile = async (sessionToken: string, objectId: string) 
     projectFile.save(null, { sessionToken });
     console.timeEnd('deleteProjectFile.save');
     return projectFile;
+}
+
+export const recursiveCopyProjectFile = async (
+    sessionToken: string,
+    project: Parse.Object,
+    object: Parse.Object,
+    targetParent: Parse.Object,
+    level = 0,
+) => {
+
+    console.log('recursiveWalkProjectDirectory.level', level)
+
+    if (object.get('isFile')) {
+        const newProjectFile = await createProjectFileFromExisting(sessionToken, project, object, targetParent);
+        return newProjectFile;
+    } else {
+        const newProjectDirectory = await createProjectDirectoryFromExisting(sessionToken, project, object, targetParent);
+        const projectFiles = await getProjectFiles(sessionToken, project, object);
+
+        for (let i = 0; i < projectFiles.length; i++) {
+            const projectFile = projectFiles[i];
+            console.log('projectFile.title', projectFile.get('title'));
+            await recursiveCopyProjectFile(sessionToken, project, projectFile, newProjectDirectory, level + 1);
+        }
+        return newProjectDirectory;
+    }
+
 }
 
 
