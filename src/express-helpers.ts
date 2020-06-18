@@ -19,8 +19,8 @@ export const assertProject = async (req: Request, res: Response) => {
     const qs = req.query;
     // extract Parse Installation ID, Parse.User.current()?.sessionToken & Project shortCode from the query string
     // const installationId = qs.installationId as string;
-    const sessionToken = qs.sessionToken as string;
-    const projectShortCode = qs.projectShortCode as string;
+    const sessionToken = qs.sessionToken as string || req.body.sessionToken as string;
+    const projectShortCode = qs.projectShortCode as string || req.body.projectShortCode as string;
 
     // if (!await isValidInstallationId(installationId, sessionToken, res)) {
     //     return;

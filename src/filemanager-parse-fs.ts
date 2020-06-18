@@ -28,6 +28,10 @@ import {
     getProjectFileTemplates,
     getProjectFileTemplate,
     createProjectFileTemplateWithoutData,
+    createProjectFileTemplate,
+    deleteProjectFileTemplate,
+    renameProjectFileTemplate,
+    recursiveApplyProjectFileTemplateToProjectFile,
 } from './parse-helpers';
 import * as multer from 'multer';
 import * as moment from 'moment';
@@ -52,6 +56,40 @@ export default function() {
     app.use(bodyParser.json());
     app.use(cors());
 
+    /**
+     * Apply ProjectFileTemplate subtree to the ProjectFile as subtree of new ProjectFile(s) directories
+     */
+    app.post('/file-manager/apply', async (req: Request, res: Response) => {
+
+        // Valid Project is required
+        const project = await assertProject(req, res);
+        if (!project) return;
+
+        // Parse.User context
+        const sessionToken: string = req.query.sessionToken as string || req.body.sessionToken as string;
+
+        // Source
+        const projectFileTemplateObjectId = req.body.projectFileTemplateObjectId;
+        // Target
+        const projectFileObjectId = req.body.projectFileObjectId;
+
+        const projectFileTemplate = await getProjectFileTemplate(sessionToken, projectFileTemplateObjectId);
+        let projectFile;
+        // If !projectFileObjectId apply to the root with parent undefined
+        if (projectFileObjectId) {
+            projectFile = await getProjectFile(sessionToken, projectFileObjectId);
+        }
+
+        await recursiveApplyProjectFileTemplateToProjectFile(sessionToken, projectFileTemplate, projectFile, project);
+
+        const response = {
+            code: 200,
+            message: 'Recursive ProjectFileTemplate apply to ProjectFile is successfully done!',
+        };
+
+        res.setHeader('Content-Type', 'application/json');
+        res.json(response);
+    });
 
     /**
      * FileManager templates - CRUD for ProjectFileTemplate objects which are subtrees
@@ -139,38 +177,40 @@ export default function() {
                 files: response,
             };
         }
-        // // Action to create a new folder
-        // if (req.body.action === 'create') {
-        //     let parent;
-        //     if (objectId) {
-        //         parent = createProjectFileWithoutData(objectId);
-        //     }
-        //     const projectDirectory = await createProjectDirectory(sessionToken, title, project, parent);
-        //     response = getCreateStructure(projectDirectory);
-        // }
-        // // Action to remove a file
-        // if (req.body.action === 'delete') {
+        // Action to create a new object
+        if (req.body.action === 'create') {
+            let parent;
+            if (objectId) {
+                parent = createProjectFileTemplateWithoutData(objectId);
+                // parent = getProjectFileTemplate(sessionToken, objectId);
+            }
+            const projectFileTemplate = await createProjectFileTemplate(sessionToken, title, parent);
+            console.log('projectFileTemplate.created', projectFileTemplate);
+            response = getCreateStructure(projectFileTemplate);
+        }
+        // Action to remove a object
+        if (req.body.action === 'delete') {
 
-        //     const filesForDelete = req.body.data || [];
+            const itemsForDelete = req.body.data || [];
 
-        //     response = [];
+            response = [];
 
-        //     for (let i = 0; i < filesForDelete.length; i++) {
-        //         const fileForDelete = filesForDelete[i];
-        //         const projectFile = await deleteProjectFile(sessionToken, fileForDelete.objectId);
-        //         response.push(getUpdateStructure(projectFile).files);
-        //     }
+            for (let i = 0; i < itemsForDelete.length; i++) {
+                const itemForDelete = itemsForDelete[i];
+                const projectFileTemplate = await deleteProjectFileTemplate(sessionToken, itemForDelete.objectId);
+                response.push(getUpdateStructure(projectFileTemplate).files);
+            }
 
-        //     response = {
-        //         files: response,
-        //     };
-        // }
-        // // Action to rename a file
-        // if (req.body.action === 'rename') {
-        //     const newTitle = req.body.newName;
-        //     const projectFile = await renameProjectFile(sessionToken, objectId, newTitle);
-        //     response = getUpdateStructure(projectFile);
-        // }
+            response = {
+                files: response,
+            };
+        }
+        // Action to rename a object
+        if (req.body.action === 'rename') {
+            const newTitle = req.body.newName;
+            const projectFileTemplate = await renameProjectFileTemplate(sessionToken, objectId, newTitle);
+            response = getUpdateStructure(projectFileTemplate);
+        }
 
         res.setHeader('Content-Type', 'application/json');
         response = JSON.stringify(response);

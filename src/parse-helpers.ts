@@ -271,7 +271,7 @@ export const getProjectFileTemplate = async (sessionToken: string, objectId: str
 }
 
 export const createProjectFileTemplateWithoutData = (objectId: string) => {
-    return Parse.Object.createWithoutData(objectId);
+    return ProjectFileTemplate.createWithoutData(objectId);
 }
 
 export const getProjectFileTemplates = async (sessionToken: string, parent?: Parse.Object, searchString?: string) => {
@@ -295,3 +295,78 @@ export const getProjectFileTemplates = async (sessionToken: string, parent?: Par
     return projectFileTemplates;
 }
 
+export const buildProjectFileTemplate = (
+    title: string,
+    parent?: Parse.Object,
+) => {
+    const projectFileTemplate = new ProjectFileTemplate();
+    projectFileTemplate.set('title', title);
+    projectFileTemplate.set('isFile', false);
+
+    const acl = new Parse.ACL();
+    acl.setRoleReadAccess('EMPLOYEE', true);
+    acl.setRoleReadAccess('ADMIN', true);
+    acl.setRoleWriteAccess('ADMIN', true);
+    projectFileTemplate.setACL(acl);
+
+    if (parent) {
+        projectFileTemplate.set('parent', parent);
+    }
+
+    return projectFileTemplate;
+}
+
+export const createProjectFileTemplate = async (sessionToken: string, title: string, parent?: Parse.Object) => {
+    const projectFileTemplate = buildProjectFileTemplate(title, parent);
+    console.time('createProjectFileTemplate.save');
+    await projectFileTemplate.save(null, { sessionToken });
+    console.timeEnd('createProjectFileTemplate.save');
+    return projectFileTemplate;
+}
+
+export const deleteProjectFileTemplate = async (sessionToken: string, objectId: string) => {
+    const projectFileTemplate = await getProjectFileTemplate(sessionToken, objectId);
+    projectFileTemplate.set('deletedAt', new Date());
+    console.time('deleteProjectFileTemplate.save');
+    projectFileTemplate.save(null, { sessionToken });
+    console.timeEnd('deleteProjectFileTemplate.save');
+    return projectFileTemplate;
+}
+
+export const renameProjectFileTemplate = async (sessionToken: string, objectId: string, newTitle: string) => {
+    const projectFileTemplate = await getProjectFileTemplate(sessionToken, objectId);
+    projectFileTemplate.set('title', newTitle);
+    console.time('renameProjectFileTemplate.save');
+    projectFileTemplate.save(null, { sessionToken });
+    console.timeEnd('renameProjectFileTemplate.save');
+    return projectFileTemplate;
+}
+
+export const recursiveApplyProjectFileTemplateToProjectFile = async (
+    sessionToken: string,
+    projectFileTemplate: Parse.Object,
+    projectFile: Parse.Object,
+    project: Parse.Object,
+) => {
+
+    const projectFileFromTemplate = await createProjectDirectory(
+        sessionToken,
+        projectFileTemplate.get('title'),
+        project,
+        projectFile,
+    );
+
+    const projectFileTemplateChildren = await getProjectFileTemplates(sessionToken, projectFileTemplate);
+
+    for (let i = 0; i < projectFileTemplateChildren.length; i++) {
+
+        const projectFileTemplateChild = projectFileTemplateChildren[i];
+
+        await recursiveApplyProjectFileTemplateToProjectFile(
+            sessionToken,
+            projectFileTemplateChild,
+            projectFileFromTemplate,
+            project,
+        );
+    }
+}
