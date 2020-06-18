@@ -30,9 +30,10 @@ import * as moment from 'moment';
 import * as request from 'request';
 import { zipURLs } from './file-helpers';
 
-Parse.initialize(process.env.PARSE_SERVER_APP_ID || 'tempoProjectsApp');
-(Parse as any).serverURL = process.env.PARSE_SERVER_URL || 'https://tempo-projects-api-development.italk.hr/parse';
-(Parse as any).masterKey = process.env.PARSE_SERVER_MASTER_KEY || 'tempoProjectsAppMasterKey';
+// Connect to ParseServer
+Parse.initialize(process.env.PARSE_SERVER_APP_ID);
+(Parse as any).serverURL = process.env.PARSE_SERVER_URL;
+// (Parse as any).masterKey = process.env.PARSE_SERVER_MASTER_KEY;
 
 export default function() {
 
@@ -270,6 +271,12 @@ export default function() {
                 const url = fileManagerNode?.url;
 
                 console.log('filename', filename, 'url', url);
+
+                if (!filename || !url) {
+                    // res.writeHead(404, { 'Content-type': 'text/html' });
+                    res.setHeader('Content-Disposition', `attachment`);
+                    return res.end('No such file');
+                }
 
                 res.setHeader('Content-Disposition', `attachment; filename=${filename}; filename*=UTF-8`);
                 request(url).pipe(res);

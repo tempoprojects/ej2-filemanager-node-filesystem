@@ -33,23 +33,38 @@ export const zipURLs = (files, outStream) => {
 
     console.log('zipURLs.append', file)
 
-    https.get(file.url, (stream) => {
-
-        let name = path.join(file.rootName, file.path, file.filename);
-        if (appended.includes(name)) {
-            // name = path.join(file.path, file.name + '_' + file.objectId + file.type);
-
-            // To avoid name collision, latest file will have original name but older variants
-            // will have appended dateCreated before exstension
-            const dateCreated = moment(file.dateCreated);
-            name = path.join(file.rootName, file.path, file.name + '_' + dateCreated.format('YYYY-MM-DD_hh-mm-ss') + file.type);
+    try {
+        if (!file?.url) {
+            console.log('zipURLs.append.skip.file.url', file?.url);
+            return done();
         }
-        appended.push(name);
+        https.get(file.url, (stream) => {
+    
+            try {
+                let name = path.join(file.rootName, file.path, file.filename);
+                if (appended.includes(name)) {
+                    // name = path.join(file.path, file.name + '_' + file.objectId + file.type);
+        
+                    // To avoid name collision, latest file will have original name but older variants
+                    // will have appended dateCreated before exstension
+                    const dateCreated = moment(file.dateCreated);
+                    name = path.join(file.rootName, file.path, file.name + '_' + dateCreated.format('YYYY-MM-DD_hh-mm-ss') + file.type);
+                }
+                appended.push(name);
+        
+                zipArchive.append(stream, { name });
+                console.log('zipURLs.append.end', ++counter, '/', files.length);
+                return done();
 
-        zipArchive.append(stream, { name });
-        console.log('zipURLs.append.end', ++counter, '/', files.length);
+            } catch(e) {
+                console.log('http.get.error', e, file);
+                return done();
+            }
+        });
+    } catch(e) {
+        console.error('zipURLs.append.error', e);
         return done();
-    });
+    }
 
     // NOTE: using request LIB will hang after huge number of files
     // let stream = request.get(file.url);
@@ -63,7 +78,7 @@ export const zipURLs = (files, outStream) => {
 
     // zipArchive.append(stream, { name: path.join(file.path, file.filename) });
   }, (err) => {
-    if (err) throw err;
+    // if (err) throw err;
     zipArchive.pipe(outStream);
     zipArchive.finalize();
     console.log('zipArchive.finalize');
