@@ -1,4 +1,5 @@
 import * as Parse from 'parse/node';
+import * as path from 'path';
 
 const Project = Parse.Object.extend('Project');
 const ProjectFile = Parse.Object.extend('ProjectFile');
@@ -35,8 +36,8 @@ export const getProject = async (sessionToken: string, projectShortCode: string)
     return project;
 }
 
-export const getProjectFiles = async (sessionToken: string, project: Parse.Object, parent?: Parse.Object) => {
-    const query = new Parse.Query('ProjectFile');
+export const getProjectFiles = async (sessionToken: string, project: Parse.Object, parent?: Parse.Object, searchString?: string) => {
+    const query = new Parse.Query(ProjectFile);
     query.equalTo('project', project);
     query.doesNotExist('deletedAt'); // Do not show soft deleted files
     if (parent) {
@@ -45,6 +46,9 @@ export const getProjectFiles = async (sessionToken: string, project: Parse.Objec
     } else {
         // files/dirs in the root
         query.doesNotExist('parent');
+    }
+    if (searchString) {
+        query.contains('title', searchString);
     }
     console.time('getProjectFiles query.find')
     // const projectFiles = await query.find({ useMasterKey: true });
@@ -212,7 +216,41 @@ export const recursiveCopyProjectFile = async (
         }
         return newProjectDirectory;
     }
+}
 
+export const recursiveGetProjectFile = async (
+    sessionToken: string,
+    object: Parse.Object,
+    level = 0,
+) => {
+
+    console.log('recursiveGetProjectFile.level', level);
+    let allFiles = [];
+
+    if (!object.get('path')) {
+        object.set('path', '');
+    }
+
+    // const projectFile = await getProjectFile(sessionToken, objectId);
+    // allFiles.push(projectFile);
+
+    // For directory read children
+    if (!object.get('isFile')) {
+        const projectFiles = await getProjectFiles(sessionToken, object.get('project'), object);
+        console.log('recursiveGetProjectFile.projectFiles', projectFiles, 'level', level);
+        allFiles = allFiles.concat(projectFiles);
+        console.log('recursiveGetProjectFile.allFiles.beforeRecursion', allFiles, 'level', level);
+
+        for (let i = 0; i < projectFiles.length; i++) {
+            const child = projectFiles[i];
+            child.set('path', path.join(object.get('path'), object.get('title')));
+            allFiles = allFiles.concat(await recursiveGetProjectFile(sessionToken, child, level + 1));
+        }
+    }
+
+    console.log('recursiveGetProjectFile.allFiles.beforeReturn', allFiles);
+
+    return allFiles;
 }
 
 

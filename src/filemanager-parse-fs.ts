@@ -4,7 +4,14 @@ import * as bodyParser from 'body-parser'
 import * as cors from 'cors'
 import * as Parse from 'parse/node';
 import { Request, Response } from 'express'
-import { getReadStructure, getDetailsStructure, getCreateStructure, getExtensionFromFilename, getUpdateStructure } from './filemanager-helpers'
+import {
+    getReadStructure,
+    getDetailsStructure,
+    getCreateStructure,
+    getExtensionFromFilename,
+    getUpdateStructure,
+    parseObjectToFileManagerNode,
+} from './filemanager-helpers'
 import { assertProject } from './express-helpers';
 import {
     getProjectFiles,
@@ -15,11 +22,13 @@ import {
     createProjectFile,
     renameProjectFile,
     deleteProjectFile,
-    createProjectFileFromExisting,
     recursiveCopyProjectFile,
+    recursiveGetProjectFile,
 } from './parse-helpers';
 import * as multer from 'multer';
 import * as moment from 'moment';
+import * as request from 'request';
+import { zipURLs } from './file-helpers';
 
 Parse.initialize(process.env.PARSE_SERVER_APP_ID || 'tempoProjectsApp');
 (Parse as any).serverURL = process.env.PARSE_SERVER_URL || 'https://tempo-projects-api-development.italk.hr/parse';
@@ -43,7 +52,7 @@ export default function() {
      */
     app.post('/file-manager/actions', async (req: Request, res: Response) => {
 
-        console.log('POST /file-manager/actions started', 'body', req.body);
+        console.log('POST /file-manager/actions started', 'query', req.query, 'body', req.body);
 
         const project = await assertProject(req, res);
         if (!project) return;
@@ -71,6 +80,7 @@ export default function() {
 
         // Parse.User context
         const sessionToken: string = req.query.sessionToken as string;
+        console.log('sessionToken', sessionToken);
 
         // ONLY for copy and move actions (objectId of parent object)
         const targetObjectId = req.body.targetData?.objectId
@@ -78,13 +88,25 @@ export default function() {
         if (action === 'read') {
             if (!objectId) {
                 const projectFiles = await getProjectFiles(sessionToken, project);
-                response = getReadStructure(project, projectFiles);
+                response = getReadStructure(project, projectFiles, project);
+                response.cwd.name = '[' + project.get('shortCode') + '] ' + response.cwd.name;
+                response.cwd.isRoot = true;
             } else {
                 console.log('parentId', objectId);
                 const parent = await getProjectFile(sessionToken, objectId);
                 const projectFiles = await getProjectFiles(sessionToken, project, parent);
-                response = getReadStructure(parent, projectFiles);
+                response = getReadStructure(parent, projectFiles, project);
             }
+        }
+
+        if (action === 'search') {
+            const searchString = req.body.searchString.substr(1, req.body.searchString.length - 2);
+            let parent: Parse.Object;
+            if (objectId && project.id !== objectId) {
+                parent = createProjectFileWithoutData(objectId);
+            }
+            const projectFiles = await getProjectFiles(sessionToken, project, parent, searchString);
+            response = getReadStructure(project, projectFiles, project);
         }
 
         // Action for getDetails
@@ -126,7 +148,7 @@ export default function() {
                     //     //     parent,
                     //     // );
 
-                       
+
                     // }
 
                     response.push(getUpdateStructure(duplicatedProjectFile).files);
@@ -146,15 +168,26 @@ export default function() {
                 parent = createProjectFileWithoutData(targetObjectId);
             }
 
-            const projectFile = await getProjectFile(sessionToken, objectId);
-            if (parent) {
-                projectFile.set('parent', parent);
-            } else {
-                projectFile.unset('parent');
-            }
-            await projectFile.save(null, { sessionToken });
+            const itemsForMove = req.body.data || [];
 
-            response = getUpdateStructure(projectFile);
+            response = [];
+
+            for (let i = 0; i < itemsForMove.length; i++) {
+                const objectId = itemsForMove[i].objectId;
+                const projectFile = await getProjectFile(sessionToken, objectId);
+                if (parent) {
+                    projectFile.set('parent', parent);
+                } else {
+                    projectFile.unset('parent');
+                }
+                await projectFile.save(null, { sessionToken });
+
+                response.push(getUpdateStructure(projectFile).files);
+            }
+
+            response = {
+                files: response,
+            };
         }
         // Action to create a new folder
         if (req.body.action === 'create') {
@@ -198,6 +231,9 @@ export default function() {
      * FileManager - image preview handler
      */
     app.get('/file-manager/image', function (req, res) {
+
+        console.log('POST /file-manager/image started', 'body', req.body);
+
         res.writeHead(400, { 'Content-type': 'text/html' });
         res.end('No such image');
     });
@@ -205,9 +241,114 @@ export default function() {
     /**
      * FileManager - file download handler
      */
-    app.get('/file-manager/download', function (req, res) {
-        res.writeHead(400, { 'Content-type': 'text/html' });
-        res.end('No such file to download');
+    app.post('/file-manager/download', async (req, res) => {
+
+        console.log('/file-manager/download', 'query', req.query, 'body', req.body);
+
+        const sessionToken = req.query.sessionToken as string;
+        // const objectId = req.body.downloadInput?.objectId;
+
+        // const projectFile = await getProjectFile(sessionToken, objectId);
+        // const fileManagerNode = parseObjectToFileManagerNode(projectFile);
+
+        const downloadInput = JSON.parse(req.body.downloadInput);
+
+        const data = downloadInput?.data || [];
+        const path = downloadInput?.path;
+
+        if (!data?.length) {
+            return res.json({ message: 'data in downloadInput is missing'});
+        }
+
+        if (data.length === 1 && data[0].isFile) {
+
+            for (let i = 0; i < data?.length; i++) {
+
+                const fileManagerNode = downloadInput?.data[i];
+
+                const filename = fileManagerNode?.filename;
+                const url = fileManagerNode?.url;
+
+                console.log('filename', filename, 'url', url);
+
+                res.setHeader('Content-Disposition', `attachment; filename=${filename}; filename*=UTF-8`);
+                request(url).pipe(res);
+            }
+        } else {
+
+            const files = [];
+            const rootName = downloadInput?.data[0]?.rootName;
+
+            for (let i = 0; i < data?.length; i++) {
+
+                const fileManagerNode = downloadInput?.data[i];
+                const isRoot = downloadInput?.data[i]?.isRoot;
+
+                const objectId = fileManagerNode?.objectId;
+                const filename = fileManagerNode?.filename;
+                const name = fileManagerNode?.name;
+                const type = fileManagerNode?.type;
+                const url = fileManagerNode?.url;
+                const dateModified = fileManagerNode?.dateModified;
+
+                // Empty directories should not be included in the ZIP, and directories will be created implicity
+                if (fileManagerNode?.isFile) {
+                    files.push({ url, filename, path, name, type, objectId, dateModified });
+                }
+
+                const fetchProjectFile = async (projectFile) => {
+                    const children = await recursiveGetProjectFile(sessionToken, projectFile);
+
+                    for (let j = 0; j < children.length; j++) {
+                        const child = children[j];
+                        console.log('child.path', child.get('path'));
+                        console.log('child.title', child.get('title'));
+
+                        if (child.get('isFile')) {
+
+                            const childAsFileManagerNode = parseObjectToFileManagerNode(child);
+                            files.push({
+                                url: childAsFileManagerNode.url,
+                                filename: childAsFileManagerNode.filename,
+                                path: child.get('path'),
+                                objectId: child.id,
+                                name: childAsFileManagerNode.name,
+                                type: childAsFileManagerNode.type,
+                                dateModified: childAsFileManagerNode.dateModified,
+                            })
+                        }
+                    }
+
+                    console.log('children', children);
+                }
+
+                if (isRoot) {
+                    const project = await assertProject(req, res);
+                    if (project) {
+                        const projectFiles = await getProjectFiles(sessionToken, project);
+
+                        for (let j = 0; j < projectFiles.length; j++) {
+                            const projectFile = projectFiles[j];
+                            await fetchProjectFile(projectFile);
+                        }
+                    }
+                } else {
+
+                    if (objectId && !fileManagerNode.isFile) {
+                        const projectFile = await getProjectFile(sessionToken, objectId);
+                        await fetchProjectFile(projectFile);
+                    }
+                }
+            }
+
+            const now = moment().utc();
+            const archiveFilename = `${rootName}_DOWNLOAD_${now.format('YYYY-MM-DD_hh-mm-ss')}.zip`;
+            res.setHeader('Content-Disposition', `attachment; filename=${archiveFilename}; filename*=UTF-8`);
+            res.header('Transfer-Encoding', '');
+            zipURLs(files, res);
+
+            console.log('download.done');
+        }
     });
 
     /**

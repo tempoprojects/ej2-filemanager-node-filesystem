@@ -1,4 +1,4 @@
-const parseObjectToFileManagerNode = (obj: Parse.Object): FileManagerNode => {
+export const parseObjectToFileManagerNode = (obj: Parse.Object): FileManagerNode => {
 
     let type = '.bin';
     const file: Parse.File = obj?.attributes?.file;
@@ -7,13 +7,15 @@ const parseObjectToFileManagerNode = (obj: Parse.Object): FileManagerNode => {
     }
 
     return {
-        name: obj?.attributes?.title,
+        name: obj?.attributes?.shortTitle || obj?.attributes?.title,
         isFile: obj?.attributes?.isFile,
         size: obj?.attributes?.isFile ? obj?.attributes?.size || 1024 : null,
         dateModified: obj?.attributes?.updatedAt,
         dateCreated: obj?.attributes?.createdAt,
         hasChild: !obj?.attributes?.isFile,
         type,
+        filename: obj?.attributes?.title.endsWith(type) ? obj?.attributes?.title : obj?.attributes?.title + type,
+        url: obj?.attributes?.file?.url(),
 
         objectId: obj?.id,
     }
@@ -26,12 +28,17 @@ export const getExtensionFromFilename = (filename: string) => {
     return 'bin';
 }
 
-export const getReadStructure = (parent: Parse.Object, children: Parse.Object[]): ReadStructure => {
+export const getReadStructure = (parent: Parse.Object, children: Parse.Object[], root: Parse.Object): ReadStructure => {
+
+    const rootName = `[${root.get('shortCode')}] ${root.get('shortTitle')}`;
 
     const cwd: FileManagerNode = parseObjectToFileManagerNode(parent);
+    cwd.rootName = rootName;
 
     const files: FileManagerNode[] = children.map(obj => {
-        return parseObjectToFileManagerNode(obj);
+        const fileManagerNode = parseObjectToFileManagerNode(obj);
+        fileManagerNode.rootName = rootName;
+        return fileManagerNode;
     });
 
     const structure: ReadStructure = {
@@ -93,6 +100,9 @@ export interface FileManagerNode {
     dateCreated: string;
     hasChild: boolean;
     type: string;
+    filename: string;
+    url: string;
+    rootName?: string;
 
     objectId: string;
 }
