@@ -11,6 +11,7 @@ import {
     getExtensionFromFilename,
     getUpdateStructure,
     parseObjectToFileManagerNode,
+    getReadStructureProjectFileTemplate,
 } from './filemanager-helpers'
 import { assertProject } from './express-helpers';
 import {
@@ -24,6 +25,9 @@ import {
     deleteProjectFile,
     recursiveCopyProjectFile,
     recursiveGetProjectFile,
+    getProjectFileTemplates,
+    getProjectFileTemplate,
+    createProjectFileTemplateWithoutData,
 } from './parse-helpers';
 import * as multer from 'multer';
 import * as moment from 'moment';
@@ -48,8 +52,133 @@ export default function() {
     app.use(bodyParser.json());
     app.use(cors());
 
+
     /**
-     * FileManager actions
+     * FileManager templates - CRUD for ProjectFileTemplate objects which are subtrees
+     * which can be applyed to any directory (ProjectFile with isFile === false), this is the smart multiple NewFolder action
+     */
+    app.post('/file-manager/templates', async (req: Request, res: Response) => {
+
+        console.log('POST /file-manager/templates started', 'query', req.query, 'body', req.body);
+
+        // Parse.User context
+        const sessionToken: string = req.query.sessionToken as string;
+
+        // FileManager action
+        const action = req.body.action;
+        // FileManager response
+        let response;
+
+        // action at which object (directory)
+        const objectId = req.body.data && req.body.data[0]?.objectId;
+
+        // object's title
+        const title = req.body.name;
+
+        // ONLY for copy and move actions (objectId of parent object)
+        const targetObjectId = req.body.targetData?.objectId
+
+        if (action === 'read') {
+
+            let parent;
+            let projectFileTemplates;
+            if (!objectId) {
+                // objects at root
+                projectFileTemplates = await getProjectFileTemplates(sessionToken);
+            } else {
+                // objects at subdir
+                parent = await getProjectFileTemplate(sessionToken, objectId);
+                projectFileTemplates = await getProjectFileTemplates(sessionToken, parent);
+            }
+
+            response = getReadStructureProjectFileTemplate(parent, projectFileTemplates);
+        }
+
+        if (action === 'search') {
+            const searchString = req.body.searchString.substr(1, req.body.searchString.length - 2);
+            let parent: Parse.Object;
+            if (objectId) {
+                parent = createProjectFileTemplateWithoutData(objectId);
+            }
+            const projectFileTemplates = await getProjectFileTemplates(sessionToken, parent, searchString);
+            response = getReadStructureProjectFileTemplate(parent, projectFileTemplates);
+        }
+
+        if (req.body.action === 'move') {
+
+            let parent;
+            // For files/directories at the project root `parent` should be undefined
+            if (targetObjectId) {
+                // parent = createProjectFileTemplateWithoutData(targetObjectId);
+                parent = await getProjectFileTemplate(sessionToken, targetObjectId);
+            }
+
+            const itemsForMove = req.body.data || [];
+
+            response = [];
+
+            for (let i = 0; i < itemsForMove.length; i++) {
+                const objectId = itemsForMove[i].objectId;
+                const projectFileTemplate = await getProjectFileTemplate(sessionToken, objectId);
+
+                console.log('projectFileTemplate', projectFileTemplate);
+                console.log('projectFileTemplate.attributes', projectFileTemplate.attributes);
+
+                if (parent) {
+                    console.log('projectFileTemplate.parent', parent);
+                    projectFileTemplate.set('parent', parent);
+                } else {
+                    projectFileTemplate.unset('parent');
+                }
+                await projectFileTemplate.save(null, { sessionToken });
+
+                response.push(getUpdateStructure(projectFileTemplate).files);
+            }
+
+            response = {
+                files: response,
+            };
+        }
+        // // Action to create a new folder
+        // if (req.body.action === 'create') {
+        //     let parent;
+        //     if (objectId) {
+        //         parent = createProjectFileWithoutData(objectId);
+        //     }
+        //     const projectDirectory = await createProjectDirectory(sessionToken, title, project, parent);
+        //     response = getCreateStructure(projectDirectory);
+        // }
+        // // Action to remove a file
+        // if (req.body.action === 'delete') {
+
+        //     const filesForDelete = req.body.data || [];
+
+        //     response = [];
+
+        //     for (let i = 0; i < filesForDelete.length; i++) {
+        //         const fileForDelete = filesForDelete[i];
+        //         const projectFile = await deleteProjectFile(sessionToken, fileForDelete.objectId);
+        //         response.push(getUpdateStructure(projectFile).files);
+        //     }
+
+        //     response = {
+        //         files: response,
+        //     };
+        // }
+        // // Action to rename a file
+        // if (req.body.action === 'rename') {
+        //     const newTitle = req.body.newName;
+        //     const projectFile = await renameProjectFile(sessionToken, objectId, newTitle);
+        //     response = getUpdateStructure(projectFile);
+        // }
+
+        res.setHeader('Content-Type', 'application/json');
+        response = JSON.stringify(response);
+        res.json(response);
+    });
+
+    /**
+     * FileManager actions - CRUD for ProjectFile objects for specific Project object
      */
     app.post('/file-manager/actions', async (req: Request, res: Response) => {
 

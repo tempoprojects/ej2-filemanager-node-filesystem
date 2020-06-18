@@ -57,6 +57,8 @@ export const getDetailsStructure = (obj: Parse.Object, path: string): DetailsStr
 
     const fmNode = parseObjectToFileManagerNode(obj);
 
+    console.log('fmNode.size', fmNode.size);
+
     let size = fmNode.size === null ? '' : fmNode.size + ' B';
     if (fmNode.size > 1024) {
         size = Math.round(fmNode.size / 1024) + ' KB';
@@ -64,6 +66,8 @@ export const getDetailsStructure = (obj: Parse.Object, path: string): DetailsStr
     if (fmNode.size > (1024 * 1024)) {
         size = Math.round(fmNode.size / (1024 * 1024)) + ' MB';
     }
+
+    console.log('size', size);
 
     const structure: DetailsStructure = {
 
@@ -139,4 +143,30 @@ export interface CreateStructure {
 }
 // UpdateStructure
 export interface UpdateStructure extends CreateStructure {
+}
+
+
+/********************* ProjectFileTemplate ************************/
+
+export const getReadStructureProjectFileTemplate = (parent: Parse.Object, children: Parse.Object[]): ReadStructure => {
+
+    // Default values for root
+    let cwd: FileManagerNode | any = {
+        name: 'TEMPLATES',
+    };
+
+    if (parent) {
+        cwd = parseObjectToFileManagerNode(parent);
+    }
+
+    const files: FileManagerNode[] = children.map(obj => {
+        return parseObjectToFileManagerNode(obj);
+    });
+
+    const structure: ReadStructure = {
+        cwd,
+        files,
+    };
+
+    return structure;
 }

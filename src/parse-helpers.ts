@@ -4,6 +4,10 @@ import * as path from 'path';
 const Project = Parse.Object.extend('Project');
 const ProjectFile = Parse.Object.extend('ProjectFile');
 
+const ProjectFileTemplate = Parse.Object.extend('ProjectFileTemplate');
+
+/************************* Project & ProjectFile *****************************/
+
 // export const isAuthenticated = async (installationId: string, sessionToken: string): Promise<Parse.Object | undefined> => {
 //     const query = new Parse.Query(Parse.Session);
 //     query.equalTo('installationId', installationId);
@@ -59,7 +63,7 @@ export const getProjectFiles = async (sessionToken: string, project: Parse.Objec
 }
 
 export const getProjectFile = async (sessionToken: string, objectId: string) => {
-    const query = new Parse.Query('ProjectFile');
+    const query = new Parse.Query(ProjectFile);
     query.equalTo('objectId', objectId);
     console.time('getProjectFile query.first');
     // const projectFile = await query.first({ useMasterKey: true });
@@ -254,4 +258,40 @@ export const recursiveGetProjectFile = async (
     return allFiles;
 }
 
+
+/************************* ProjectFileTemplate *****************************/
+
+export const getProjectFileTemplate = async (sessionToken: string, objectId: string) => {
+    const query = new Parse.Query(ProjectFileTemplate);
+    query.equalTo('objectId', objectId);
+    console.time('getProjectFileTemplate query.first');
+    const projectFileTemplate = await query.first({ sessionToken });
+    console.timeEnd('getProjectFileTemplate query.first');
+    return projectFileTemplate;
+}
+
+export const createProjectFileTemplateWithoutData = (objectId: string) => {
+    return Parse.Object.createWithoutData(objectId);
+}
+
+export const getProjectFileTemplates = async (sessionToken: string, parent?: Parse.Object, searchString?: string) => {
+    const query = new Parse.Query(ProjectFileTemplate);
+    query.doesNotExist('deletedAt'); // Do not show soft deleted files
+    // query.descending('createdAt');
+    if (parent) {
+        // objects in subdirectories
+        query.equalTo('parent', parent);
+    } else {
+        // objects in the root
+        query.doesNotExist('parent');
+    }
+    if (searchString) {
+        query.contains('title', searchString);
+    }
+    console.time('getProjectFileTemplates query.find')
+    // const projectFiles = await query.find({ useMasterKey: true });
+    const projectFileTemplates = await query.find({ sessionToken });
+    console.timeEnd('getProjectFileTemplates query.find')
+    return projectFileTemplates;
+}
 
