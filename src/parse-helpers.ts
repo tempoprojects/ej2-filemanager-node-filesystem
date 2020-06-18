@@ -40,6 +40,7 @@ export const getProjectFiles = async (sessionToken: string, project: Parse.Objec
     const query = new Parse.Query(ProjectFile);
     query.equalTo('project', project);
     query.doesNotExist('deletedAt'); // Do not show soft deleted files
+    query.descending('createdAt');
     if (parent) {
         // files/dirs in subdirectories
         query.equalTo('parent', parent);

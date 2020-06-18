@@ -279,6 +279,11 @@ export default function() {
             const files = [];
             const rootName = downloadInput?.data[0]?.rootName;
 
+            // Sort createdAt DESC because older files should be added later with appended dateCreated in the filename
+            data.sort((a, b) => {
+                if (a.dateCreated < b.dateCreated) { return 1; } return -1;
+            });
+
             for (let i = 0; i < data?.length; i++) {
 
                 const fileManagerNode = downloadInput?.data[i];
@@ -290,10 +295,11 @@ export default function() {
                 const type = fileManagerNode?.type;
                 const url = fileManagerNode?.url;
                 const dateModified = fileManagerNode?.dateModified;
+                const dateCreated = fileManagerNode?.dateCreated;
 
                 // Empty directories should not be included in the ZIP, and directories will be created implicity
                 if (fileManagerNode?.isFile) {
-                    files.push({ url, filename, path, name, type, objectId, dateModified });
+                    files.push({ url, filename, path, name, type, objectId, dateModified, dateCreated, rootName });
                 }
 
                 const fetchProjectFile = async (projectFile) => {
@@ -315,6 +321,8 @@ export default function() {
                                 name: childAsFileManagerNode.name,
                                 type: childAsFileManagerNode.type,
                                 dateModified: childAsFileManagerNode.dateModified,
+                                dateCreated: childAsFileManagerNode.dateCreated,
+                                rootName,
                             })
                         }
                     }
@@ -344,7 +352,7 @@ export default function() {
             const now = moment().utc();
             const archiveFilename = `${rootName}_DOWNLOAD_${now.format('YYYY-MM-DD_hh-mm-ss')}.zip`;
             res.setHeader('Content-Disposition', `attachment; filename=${archiveFilename}; filename*=UTF-8`);
-            res.header('Transfer-Encoding', '');
+            // res.header('Transfer-Encoding', '');
             zipURLs(files, res);
 
             console.log('download.done');

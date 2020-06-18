@@ -1,8 +1,6 @@
 const async  = require('async');
-const request  = require('request');
 const  archiver = require('archiver');
 import * as path from 'path';
-import { response } from 'express';
 const https = require('https');
 import * as moment from 'moment';
 
@@ -37,13 +35,14 @@ export const zipURLs = (files, outStream) => {
 
     https.get(file.url, (stream) => {
 
-        let name = path.join(file.path, file.filename);
+        let name = path.join(file.rootName, file.path, file.filename);
         if (appended.includes(name)) {
             // name = path.join(file.path, file.name + '_' + file.objectId + file.type);
 
-            const dateModified = moment(file.dateModified);
-
-            name = path.join(file.path, file.name + '_' + dateModified.format('YYYY-MM-DD_hh-mm-ss') + file.type);
+            // To avoid name collision, latest file will have original name but older variants
+            // will have appended dateCreated before exstension
+            const dateCreated = moment(file.dateCreated);
+            name = path.join(file.rootName, file.path, file.name + '_' + dateCreated.format('YYYY-MM-DD_hh-mm-ss') + file.type);
         }
         appended.push(name);
 
