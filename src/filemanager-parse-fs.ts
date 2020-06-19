@@ -59,7 +59,7 @@ export default function() {
     /**
      * Apply ProjectFileTemplate subtree to the ProjectFile as subtree of new ProjectFile(s) directories
      */
-    app.post('/file-manager/apply', async (req: Request, res: Response) => {
+    app.post('/filemanager/apply', async (req: Request, res: Response) => {
 
         // Valid Project is required
         const project = await assertProject(req, res);
@@ -95,9 +95,9 @@ export default function() {
      * FileManager templates - CRUD for ProjectFileTemplate objects which are subtrees
      * which can be applyed to any directory (ProjectFile with isFile === false), this is the smart multiple NewFolder action
      */
-    app.post('/file-manager/templates', async (req: Request, res: Response) => {
+    app.post('/filemanager/templates', async (req: Request, res: Response) => {
 
-        console.log('POST /file-manager/templates started', 'query', req.query, 'body', req.body);
+        console.log('POST /filemanager/templates started', 'query', req.query, 'body', req.body);
 
         // Parse.User context
         const sessionToken: string = req.query.sessionToken as string;
@@ -220,9 +220,9 @@ export default function() {
     /**
      * FileManager actions - CRUD for ProjectFile objects for specific Project object
      */
-    app.post('/file-manager/actions', async (req: Request, res: Response) => {
+    app.post('/filemanager/actions', async (req: Request, res: Response) => {
 
-        console.log('POST /file-manager/actions started', 'query', req.query, 'body', req.body);
+        console.log('POST /filemanager/actions started', 'query', req.query, 'body', req.body);
 
         const project = await assertProject(req, res);
         if (!project) return;
@@ -400,9 +400,9 @@ export default function() {
     /**
      * FileManager - image preview handler
      */
-    app.get('/file-manager/image', function (req, res) {
+    app.get('/filemanager/image', function (req, res) {
 
-        console.log('POST /file-manager/image started', 'body', req.body);
+        console.log('POST /filemanager/image started', 'body', req.body);
 
         res.writeHead(400, { 'Content-type': 'text/html' });
         res.end('No such image');
@@ -411,9 +411,9 @@ export default function() {
     /**
      * FileManager - file download handler
      */
-    app.post('/file-manager/download', async (req, res) => {
+    app.post('/filemanager/download', async (req, res) => {
 
-        console.log('/file-manager/download', 'query', req.query, 'body', req.body);
+        console.log('/filemanager/download', 'query', req.query, 'body', req.body);
 
         const sessionToken = req.query.sessionToken as string;
         // const objectId = req.body.downloadInput?.objectId;
@@ -569,7 +569,7 @@ export default function() {
         },
     };
 
-    app.post('/file-manager/upload', multer(multerConfig).any(), async (req, res) => {
+    app.post('/filemanager/upload', multer(multerConfig).any(), async (req, res) => {
 
         res.setHeader('Content-Type', 'application/json');
         const files = req.files;
